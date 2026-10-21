@@ -2,15 +2,13 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches: [main]
 
 jobs:
   tests:
     uses: ./.github/workflows/tests.yml
 
   # Builds and installs the MSI on every PR so packaging breakage shows up
-  # before a release. The installer is kept as a run artifact.
+  # before merging. The installer is kept as a run artifact.
   msi:
     needs: tests
     uses: ./.github/workflows/build-msi.yml
