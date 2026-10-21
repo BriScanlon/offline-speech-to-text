@@ -1,0 +1,31 @@
+<!-- Windows x64 installer for ostt. Built by .github/workflows/build-msi.yml:
+     wix build packaging\ostt.wxs build\files.wxs -arch x64 -d Version=1.2.3 -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Offline Speech to Text"
+           Manufacturer="BriScanlon"
+           Version="$(var.Version)"
+           UpgradeCode="72a81e03-43c9-468c-90fa-17dc7bf0bbc5"
+           Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Offline Speech to Text is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Offline Speech to Text" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Offline Speech to Text">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="AddToPath" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <!-- Puts ostt on the system PATH so it runs from any terminal. -->
+    <Component Id="AddToPath" Directory="INSTALLFOLDER" Guid="f125fb75-9a8e-4d44-8d5d-67935da9882e">
+      <RegistryValue Root="HKLM" Key="Software\OfflineSpeechToText" Name="InstallDir"
+                     Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+      <Environment Id="PathEntry" Name="PATH" Value="[INSTALLFOLDER]"
+                   Action="set" Part="last" System="yes" Permanent="no" />
+    </Component>
+  </Fragment>
+</Wix>

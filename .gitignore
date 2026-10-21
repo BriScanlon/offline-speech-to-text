@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+# Local output: transcripts and mic test logs stay on the machine
+transcripts/
+mic_tests.csv
+tests/fixtures/
