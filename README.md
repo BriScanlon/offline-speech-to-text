@@ -168,16 +168,25 @@ Windows, then builds the MSI, installs it on a clean Windows runner and runs
 `ostt selfcheck` from the installed copy. Each PR run keeps its MSI as a
 downloadable artifact.
 
-To publish a release, tag a commit on `main`:
+**Every merge to `main` is released automatically.** The **Release** workflow
+takes the highest `vX.Y.Z` tag, bumps it, runs the tests, builds
+`offline-speech-to-text-X.Y.Z-x64.msi`, and publishes a GitHub release with the
+MSI attached and notes generated from the merged PRs (which creates the tag).
+No commit is pushed back to `main`; the version lives in the tags and is
+stamped into the build. Control the bump from the PR title:
 
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
+| PR title contains | Example | Result |
+| --- | --- | --- |
+| nothing | `Fix chunk timing` | patch: 0.1.3 → 0.1.4 |
+| `[minor]` | `Add search filters [minor]` | minor: 0.1.3 → 0.2.0 |
+| `[major]` | `New file layout [major]` | major: 0.1.3 → 1.0.0 |
+| `[skip release]` | `Docs tweak [skip release]` | no release |
 
-The **Release** workflow runs the tests again, builds
-`offline-speech-to-text-0.2.0-x64.msi`, and creates a GitHub release with
-the MSI attached and notes generated from the merged PRs.
+Squash merges use the PR title as the commit message, so the marker always
+reaches `main`. With a merge commit, the PR title is in the message body,
+which is also checked. The first release is `v0.1.0`. A release can also be
+re-run by hand from the Actions tab (**Release → Run workflow**), which makes a
+patch bump.
 
 Packaging lives in `packaging/`. PyInstaller freezes `ostt.exe` with its
 native libraries (`ostt.spec`), and WiX 5 wraps that folder in the MSI

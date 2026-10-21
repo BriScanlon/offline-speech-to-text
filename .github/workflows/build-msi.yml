@@ -26,6 +26,13 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Stamp version
+        shell: pwsh
+        run: |
+          $f = "src/offline_stt/__init__.py"
+          (Get-Content $f) -replace '^__version__ = .*', "__version__ = `"$env:VERSION`"" | Set-Content $f
+          Select-String '__version__' $f
+
       - name: Install app and build tools
         run: |
           pip install .
@@ -58,8 +65,11 @@ jobs:
           $msi = Resolve-Path dist\offline-speech-to-text-$env:VERSION-x64.msi
           $p = Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /l*v install.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 50; exit $p.ExitCode }
-          & "$env:ProgramFiles\Offline Speech to Text\ostt.exe" selfcheck
+          $exe = "$env:ProgramFiles\Offline Speech to Text\ostt.exe"
+          & $exe selfcheck
           if ($LASTEXITCODE -ne 0) { exit 1 }
+          $v = & $exe --version
+          if ($v -ne "ostt $env:VERSION") { Write-Error "Installed version is '$v', expected $env:VERSION"; exit 1 }
 
       - uses: actions/upload-artifact@v4
         with:

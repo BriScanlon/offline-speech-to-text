@@ -242,6 +242,9 @@ def cmd_selfcheck(args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ostt", description="Offline live speech-to-text. Audio is never saved; only text is.")
+    from offline_stt import __version__
+
+    parser.add_argument("--version", action="version", version=f"ostt {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("devices", help="list microphones and other inputs").set_defaults(func=cmd_devices)

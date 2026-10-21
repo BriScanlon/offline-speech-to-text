@@ -1,10 +1,17 @@
 name: Release
 
-# Push a tag like v0.2.0 on main to test, build the MSI and publish a release:
-#   git tag v0.2.0 && git push origin v0.2.0
+# Every merge to main is released: the version is bumped from the highest
+# vX.Y.Z tag (patch by default; [minor] or [major] in the PR title for more,
+# [skip release] to skip), then the tests run, the MSI is built, and a
+# GitHub release is published, which also creates the tag.
 on:
   push:
-    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   version:
@@ -12,10 +19,19 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - id: v
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          message="$(git log -1 --format=%B)"
+          version="$(python3 packaging/next_version.py "$message" $(git tag --list 'v*'))"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ -n "$version" ]; then echo "Releasing v$version"; else echo "Skipping release"; fi
 
   tests:
+    needs: version
+    if: needs.version.outputs.version != ''
     uses: ./.github/workflows/tests.yml
 
   msi:
@@ -25,7 +41,7 @@ jobs:
       version: ${{ needs.version.outputs.version }}
 
   publish:
-    needs: msi
+    needs: [version, msi]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -34,11 +50,13 @@ jobs:
         with:
           name: msi
           path: dist
-      - name: Create GitHub release
+      - name: Create tag and GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.msi \
+          gh release create "v$VERSION" dist/*.msi \
             --repo "$GITHUB_REPOSITORY" \
-            --title "$GITHUB_REF_NAME" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
             --generate-notes
