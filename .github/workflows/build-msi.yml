@@ -1,0 +1,68 @@
+name: Build Windows MSI
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "MSI version, numeric x.y.z"
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            packaging/requirements-build.txt
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install app and build tools
+        run: |
+          pip install .
+          pip install -r packaging/requirements-build.txt
+          dotnet tool install --global wix --version 5.0.2
+
+      - name: Freeze ostt.exe
+        run: pyinstaller packaging/ostt.spec --noconfirm --clean --distpath dist --workpath build
+
+      - name: Smoke test the frozen exe
+        shell: pwsh
+        run: |
+          dist\ostt\ostt.exe --help
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          # Imports the full model stack without downloading a model.
+          dist\ostt\ostt.exe selfcheck
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          python packaging/make_files_wxs.py dist\ostt build\files.wxs
+          wix build packaging\ostt.wxs build\files.wxs -arch x64 `
+            -d Version=$env:VERSION `
+            -o dist\offline-speech-to-text-$env:VERSION-x64.msi
+
+      - name: Install the MSI and run the installed exe
+        shell: pwsh
+        run: |
+          $msi = Resolve-Path dist\offline-speech-to-text-$env:VERSION-x64.msi
+          $p = Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn /l*v install.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 50; exit $p.ExitCode }
+          & "$env:ProgramFiles\Offline Speech to Text\ostt.exe" selfcheck
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: msi
+          path: dist/*.msi
+          if-no-files-found: error

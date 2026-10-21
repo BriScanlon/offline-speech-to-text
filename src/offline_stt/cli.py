@@ -215,6 +215,30 @@ def cmd_search(args) -> int:
     return 0 if hits else 1
 
 
+def cmd_selfcheck(args) -> int:
+    """Check the speech stack loads, without opening a mic or downloading a model."""
+    import ctranslate2
+    import faster_whisper
+    import soxr
+    from faster_whisper.vad import get_vad_model
+
+    from offline_stt import __version__
+
+    get_vad_model()  # loads the bundled Silero VAD through onnxruntime
+    soxr.resample(np.zeros(4800, dtype=np.float32), 48000, 16000)
+    print(f"ostt {__version__}, faster-whisper {faster_whisper.__version__}, "
+          f"ctranslate2 {ctranslate2.__version__}")
+    try:
+        import sounddevice as sd
+
+        print(f"PortAudio: {sd.get_portaudio_version()[1]}")
+    except OSError as exc:
+        print(f"PortAudio not available: {exc}")
+        return 1
+    print("OK")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ostt", description="Offline live speech-to-text. Audio is never saved; only text is.")
@@ -248,6 +272,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seconds", type=float, default=30.0, help="recording length (default: 30)")
     p.add_argument("--csv", default="mic_tests.csv", help="results log (default: mic_tests.csv)")
     p.set_defaults(func=cmd_test)
+
+    sub.add_parser("selfcheck", help="check the install works (no mic or model needed)").set_defaults(
+        func=cmd_selfcheck)
 
     p = sub.add_parser("search", help="search saved transcripts")
     p.add_argument("pattern", help="phrase to find (or a regular expression with --regex)")

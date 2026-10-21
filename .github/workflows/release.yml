@@ -1,0 +1,44 @@
+name: Release
+
+# Push a tag like v0.2.0 on main to test, build the MSI and publish a release:
+#   git tag v0.2.0 && git push origin v0.2.0
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  msi:
+    needs: [version, tests]
+    uses: ./.github/workflows/build-msi.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
+  publish:
+    needs: msi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: msi
+          path: dist
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.msi \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
